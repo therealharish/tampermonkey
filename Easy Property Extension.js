@@ -10,8 +10,6 @@
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
 // @require      https://code.jquery.com/jquery-1.8.2.min.js
-// @downloadURL https://update.greasyfork.org/scripts/524340/Easy%20Property%20Rent%20Extension.user.js
-// @updateURL https://update.greasyfork.org/scripts/524340/Easy%20Property%20Rent%20Extension.meta.js
 // ==/UserScript==
 
 /******************** CONFIG SETTINGS ********************/
@@ -19,7 +17,7 @@ const apikey = "YOUR_API_KEY_HERE"; // Full access API key required to pull hist
 const days_remaining = 7; // Number of days remaining or less to be included in reminders.
 const default_days = 15; // Default number of days to extend the lease if data can't be found.
 const default_cost = 5600000; // Default cost of lease extension if data can't be found.
-const default_extension_days = 15; // Default number of days for extending an existing lease via market pricing.
+const default_extension_days = 30; // Default number of days for extending an existing lease via market pricing.
 const properties = [13]; // Array of property types allowed for renting. Ex: [12, 13] for Castles and Private Islands. Reference property IDs below as necessary.
 const hex_color = "#8ABEEF"; // Hexcode to apply to the box.
 const debug = 1; // Leave alone unless you want console logs.
@@ -52,6 +50,8 @@ $(document).ready(function() {
     let rentalMarketCache = {};
     let current_page = null;
     let property_details = null;
+    let userSelectedRow = false;
+    let processedPropertyId = null;
     let hex_darker = "#53728f";
     let player_id = $('#sidebarroot a[href*="profiles.php?XID="]').attr('href')?.match(/XID=(\d+)/)?.[1];
 
@@ -149,6 +149,11 @@ $(document).ready(function() {
 
     function checkTabAndRunScript() {
         // Do the stuff!
+        const currentPropertyId = getParam('ID');
+        if (currentPropertyId !== processedPropertyId) {
+            userSelectedRow = false;
+            processedPropertyId = currentPropertyId;
+        }
         var page = getParam('tab');
         if (page === 'offerExtension') {
             drawNavigation();
@@ -174,6 +179,10 @@ $(document).ready(function() {
 
     function setDefaultLeaseFields()
     {
+        if ($('#icey-rental-listings').length && userSelectedRow) {
+            log('Skipping setDefaultLeaseFields - user has selected a row');
+            return;
+        }
         const property_id = getParam('ID');
         const propertyType = property_details ? property_details.property_type : properties[0];
 
@@ -407,6 +416,8 @@ $(document).ready(function() {
                 // Highlight selected row
                 $('.rental-row').removeClass('selected');
                 $(this).addClass('selected');
+
+                userSelectedRow = true;
             }
         });
     }
@@ -421,6 +432,10 @@ $(document).ready(function() {
         const daysInputSel = '.offerExtension.input-money[data-name="days"]';
 
         fetchMarketRentals(propertyType, propertyHappy).then(function(rentals) {
+            if ($('#icey-rental-listings').length && userSelectedRow) {
+                log('Skipping getPreviousValues auto-fill - user has selected a row');
+                return;
+            }
             // Filter rentals matching this property's happy value
             let matchingRentals = rentals.filter(r => r.happy === propertyHappy);
 
