@@ -307,7 +307,7 @@
 .trade-status-indicator {font-weight:600;font-size:10px;margin-left:8px;padding:3px 7px;border-radius:3px;white-space:nowrap;display:inline-block}
 .stripe-container {width:100%;background:var(--bg-med);margin:0;border-radius:8px;display:flex;justify-content:center;align-items:center;padding:15px 30px;border:1px solid var(--border);box-shadow:var(--shadow);transition:var(--transition);box-sizing:border-box;gap:10px;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .stripe-container.expanded {justify-content:space-around}
-.calculate-button,.total-value-container,.receipt-url-container,.copy-url-button,.view-edit-receipt-button,.accept-trade-button {padding:10px 20px;background:linear-gradient(145deg,var(--bg-light),var(--bg-lighter));color:var(--text);border:1px solid var(--bg-med);border-radius:var(--radius);cursor:pointer;font:14px 'Segoe UI',Tahoma,sans-serif;margin:0;transition:var(--transition),transform .2s;text-align:center;white-space:nowrap;min-width:150px;flex:0 1 auto;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.calculate-button,.total-value-container,.receipt-url-container,.copy-url-button,.view-edit-receipt-button,.accept-trade-button {padding:10px 20px;background:linear-gradient(145deg,var(--bg-light),var(--bg-lighter));color:var(--text);border:1px solid var(--bg-med);border-radius:var(--radius);cursor:pointer;font:14px 'Segoe UI',Tahoma,sans-serif;margin:0;transition:var(--transition),transform .2s;text-align:center;white-space:nowrap;min-width:0;flex:0 1 auto;-webkit-tap-highlight-color:transparent;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .calculate-button:hover,.total-value-container:hover,.receipt-url-container:hover,.copy-url-button:hover,.view-edit-receipt-button:hover,.accept-trade-button:hover:not(:disabled),.calculate-button:active,.total-value-container:active,.receipt-url-container:active,.copy-url-button:active,.view-edit-receipt-button:active,.accept-trade-button:active:not(:disabled) {background:linear-gradient(145deg,var(--bg-lighter),var(--bg-light));transform:translateY(-2px)}
 .accept-trade-button:disabled {opacity:.5;cursor:not-allowed;background:linear-gradient(145deg,var(--bg-med),var(--bg-light))}
 .accept-trade-button.enabled {background:linear-gradient(145deg,var(--success),var(--success-hover))}
@@ -316,8 +316,8 @@
 .accept-trade-button.button-error {background:linear-gradient(145deg,#dc2626,#b91c1c)}
 .button-icon {display:none}
 .button-text {display:inline}
-.value-container {display:none;align-items:center;justify-content:space-evenly;flex-grow:1}
-.value-container.visible {display:flex}
+.value-container {display:none;align-items:center;justify-content:center;flex-grow:1}
+.value-container.visible {display:flex;gap:10px}
 .hidden {display:none}
 .content-hidden {display:none}
 .content-visible {display:block}
@@ -385,7 +385,7 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
 .stripe-container {display:flex !important;flex-direction:row !important;flex-wrap:wrap !important;gap:8px !important;padding:15px !important;align-items:stretch !important;justify-content:space-between !important}
 .stripe-container>.value-container,.stripe-container>.value-container.visible {display:contents !important;flex-direction:unset !important}
 .stripe-container>.value-container>.total-value-container,.stripe-container .total-value-container {width:100% !important;max-width:100% !important;min-width:100% !important;flex:0 0 100% !important;margin:0 !important;padding:12px 20px !important;font-size:16px !important;box-shadow:0 2px 4px rgba(0,0,0,.2) !important;order:-3 !important;box-sizing:border-box !important}
-.stripe-container>.calculate-button,.stripe-container>.value-container>.receipt-url-container,.stripe-container .receipt-url-container,.stripe-container>.accept-trade-button {width:calc(33.333% - 5.33px) !important;max-width:calc(33.333% - 5.33px) !important;min-width:0 !important;flex:0 0 calc(33.333% - 5.33px) !important;margin:0 !important;padding:12px 6px !important;font-size:12px !important;box-shadow:0 2px 4px rgba(0,0,0,.2) !important;white-space:nowrap !important;overflow:hidden !important;box-sizing:border-box !important;text-overflow:clip !important}
+.stripe-container>.calculate-button,.stripe-container>.value-container>.receipt-url-container,.stripe-container .receipt-url-container,.stripe-container>.accept-trade-button {width:calc(25% - 6px) !important;max-width:calc(25% - 6px) !important;min-width:0 !important;flex:0 0 calc(25% - 6px) !important;margin:0 !important;padding:12px 6px !important;font-size:12px !important;box-shadow:0 2px 4px rgba(0,0,0,.2) !important;white-space:nowrap !important;overflow:hidden !important;box-sizing:border-box !important;text-overflow:clip !important}
 .stripe-container>.calculate-button {order:-2 !important}
 .stripe-container>.value-container>.receipt-url-container,.stripe-container .receipt-url-container {order:-1 !important}
 .stripe-container>.accept-trade-button {order:0 !important}
@@ -417,7 +417,7 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
 .stripe-container {display:flex !important;flex-direction:row !important;flex-wrap:wrap !important;gap:6px !important;padding:12px !important;align-items:stretch !important;justify-content:space-between !important}
 .stripe-container>.value-container,.stripe-container>.value-container.visible {display:contents !important;flex-direction:unset !important}
 .stripe-container>.value-container>.total-value-container,.stripe-container .total-value-container {width:100% !important;max-width:100% !important;min-width:100% !important;flex:0 0 100% !important;margin:0 !important;padding:14px !important;font-size:14px !important;order:-3 !important;box-sizing:border-box !important}
-.stripe-container>.calculate-button,.stripe-container>.value-container>.receipt-url-container,.stripe-container .receipt-url-container,.stripe-container>.accept-trade-button {width:calc(33.333% - 4px) !important;max-width:calc(33.333% - 4px) !important;min-width:0 !important;flex:0 0 calc(33.333% - 4px) !important;margin:0 !important;padding:12px 3px !important;font-size:11px !important;white-space:nowrap !important;overflow:hidden !important;box-sizing:border-box !important;text-overflow:clip !important}
+.stripe-container>.calculate-button,.stripe-container>.value-container>.receipt-url-container,.stripe-container .receipt-url-container,.stripe-container>.accept-trade-button {width:calc(25% - 4.5px) !important;max-width:calc(25% - 4.5px) !important;min-width:0 !important;flex:0 0 calc(25% - 4.5px) !important;margin:0 !important;padding:12px 3px !important;font-size:11px !important;white-space:nowrap !important;overflow:hidden !important;box-sizing:border-box !important;text-overflow:clip !important}
 .stripe-container>.calculate-button {order:-2 !important}
 .stripe-container>.value-container>.receipt-url-container,.stripe-container .receipt-url-container {order:-1 !important}
 .stripe-container>.accept-trade-button {order:0 !important}
@@ -1824,7 +1824,8 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
         if (!isTradePage) return;
 
         const total = q('.total-value-container');
-        const receipt = q('.receipt-url-container');
+        const receipt = q('.receipt-url-container:not(.copy-msg-container)');
+        const copyMsgEl = q('.copy-msg-container');
         const container = q('.value-container');
         const stripe = q('.stripe-container');
 
@@ -1832,12 +1833,22 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
             total.textContent = `Total Value: $${currentReceipt.total_value.toLocaleString()}`;
 
             if (currentReceipt.items?.length > 0 && currentReceiptURL) {
-                [total, receipt].forEach(e => e.classList.remove('hidden'));
-                removeHandler(receipt);
-                addHandler(receipt, showModal);
+                [total, receipt].forEach(e => { if (e) e.classList.remove('hidden'); });
+                if (receipt) {
+                    removeHandler(receipt);
+                    addHandler(receipt, showModal);
+                }
             } else {
-                total.classList.remove('hidden');
-                receipt.classList.add('hidden');
+                if (total) total.classList.remove('hidden');
+                if (receipt) receipt.classList.add('hidden');
+            }
+
+            if (copyMsgEl) {
+                if (currentTradeMessage) {
+                    copyMsgEl.classList.remove('hidden');
+                } else {
+                    copyMsgEl.classList.add('hidden');
+                }
             }
 
             container.classList.add('visible');
@@ -2341,7 +2352,17 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
                     onClick: showModal
                 });
 
-                const container = el('div', { classes: ['value-container'], children: [total, receipt] });
+                const copyMsgBtn = el('div', {
+                    classes: ['receipt-url-container', 'copy-msg-container'],
+                    html: `${SVG_ICONS.paste}<span class="button-text">Copy Message</span>`,
+                    onClick: async () => {
+                        if (!currentTradeMessage) return;
+                        const success = await copyToClipboard(currentTradeMessage);
+                        showMsg(copyMsgBtn, success ? 'Copied!' : 'Copy failed', 1000);
+                    }
+                });
+
+                const container = el('div', { classes: ['value-container'], children: [total, receipt, copyMsgBtn] });
                 const tradeID = getTradeID();
 
                 const backToTradeBtn = createButton(['calculate-button'], SVG_ICONS.back, 'Back to Trade',
@@ -2369,6 +2390,11 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
                                 container.classList.add('visible');
                             } else {
                                 receipt.classList.add('hidden');
+                            }
+                            if (currentTradeMessage) {
+                                copyMsgBtn.classList.remove('hidden');
+                            } else {
+                                copyMsgBtn.classList.add('hidden');
                             }
                         }
                     }
@@ -2422,7 +2448,17 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
             onClick: showModal
         });
 
-        const container = el('div', { classes: ['value-container'], children: [total, receipt] });
+        const copyMsgBtn = el('div', {
+            classes: ['hidden', 'receipt-url-container', 'copy-msg-container'],
+            html: `${SVG_ICONS.paste}<span class="button-text">Copy Message</span>`,
+            onClick: async () => {
+                if (!currentTradeMessage) return;
+                const success = await copyToClipboard(currentTradeMessage);
+                showMsg(copyMsgBtn, success ? 'Copied!' : 'Copy failed', 1000);
+            }
+        });
+
+        const container = el('div', { classes: ['value-container'], children: [total, receipt, copyMsgBtn] });
         let children = [];
 
         if (isAddMoneyPage) {
@@ -2502,6 +2538,7 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
                     currentTradeMessage = res.message || null;
                     total.textContent = `Total Value: $${currentReceipt.total_value.toLocaleString()}`;
                     [total, receipt].forEach(e => e.classList.remove('hidden'));
+                    if (currentTradeMessage) copyMsgBtn.classList.remove('hidden');
                     container.classList.add('visible');
                     stripe.classList.add('expanded');
                     updateAcceptBtn(accept);
@@ -2581,7 +2618,16 @@ body.dark-mode .msg.right-round button.api-key-button,body.dark-mode .title-blac
             onClick: matchedTrade ? showModal : null
         });
 
-        const container = el('div', { classes: ['value-container', 'visible'], children: [total, receipt] });
+        const copyMsgBtn = el('div', {
+            classes: ['receipt-url-container', 'copy-msg-container', (matchedTrade && currentTradeMessage) ? '' : 'hidden'].filter(Boolean),
+            html: `${SVG_ICONS.paste}<span class="button-text">Copy Message</span>`,
+            onClick: (matchedTrade && currentTradeMessage) ? async () => {
+                const success = await copyToClipboard(currentTradeMessage);
+                showMsg(copyMsgBtn, success ? 'Copied!' : 'Copy failed', 1000);
+            } : null
+        });
+
+        const container = el('div', { classes: ['value-container', 'visible'], children: [total, receipt, copyMsgBtn] });
 
         const statusBtn = createButton(
             ['accept-trade-button', matchedTrade ? 'button-accepted' : ''].filter(Boolean),
