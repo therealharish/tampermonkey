@@ -93,7 +93,7 @@
         .filler-nav-link { cursor: pointer; margin-left: 15px; font-size: 12px; color: #ccc; text-transform: uppercase; font-weight: bold; }
 
         @media screen and (max-width: 600px) {
-            .title-black { height: auto !important; min-height: 34px; padding-bottom: 5px !important; }
+            .title-black, .panelHeader___PHqEv { height: auto !important; min-height: 34px; padding-bottom: 5px !important; }
             .filler-header-links { float: none !important; width: 100%; justify-content: space-around; margin-top: 5px; border-top: 1px solid #333; padding-top: 5px; }
             .fill-all-btn, .fill-qty-btn, .filler-nav-link { margin-left: 0 !important; }
         }
@@ -332,7 +332,9 @@
 
         const isArmorCategory = $('.armour-category-icon').closest('li').hasClass('ui-state-active');
 
-        const header = isManage ? $(".panelHeader___PHqEv:contains('Manage your Bazaar')") : $(".title-black:contains('Add items to your Bazaar')");
+        const header = isManage ?
+    $(".panelHeader___IEoAo, [data-testid='panel-header'], .panelHeader___PHqEv, .title-black").filter(":contains('Manage your Bazaar')").first() :
+    $(".title-black:contains('Add items to your Bazaar')");
         if (header.length && $(".fill-all-btn").length === 0) {
             header.append(`<div class="filler-header-links"><a class="fill-qty-btn" id="f-qty">Fill Qty</a><a class="fill-all-btn" id="f-all">Fill All</a><a class="filler-nav-link" id="f-cfg">Settings</a></div>`);
             $("#f-cfg").on('touchstart click', (e) => { e.preventDefault(); $("#filler-config-modal").show(); });
@@ -408,7 +410,10 @@
                         $('<div class="item-toggle-btn">$</div>').appendTo($cont).on('click', (e) => { e.stopPropagation(); showDualTable(e, $row, itemId, $row.find('[class*="name"]').first().text().trim()); });
                     }
                 } else {
-                    let $target = isAdd ? $row.find('.info-wrap') : $row.find('[class*="bonuses___pTH_L"]');
+                    let $target = isAdd ? $row.find('.info-wrap') : $row.find('[class*="bonuses___"]');
+                    if (!$target.length && isManage) {
+                        $target = $row.find('[class*="price___"]').parent();
+                    }
                     if ($target.length) {
                         $target.css('display', 'flex');
                         const $cont = $(`<div class="pc-filler-container">${cbHTML}</div>`).appendTo($target);
