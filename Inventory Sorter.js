@@ -2,9 +2,14 @@
 // @name          Inventory Sorter according to QTY
 // @namespace     https://greasyfork.org/en/users/1362698-iambatman
 // @description   Allows you to sort your inventory by price or quantity in ascending/descending order
-// @version       1.1.0
+// @version       2.0.0
 // @author        Unique
-// @grant         none
+// @grant         GM_xmlhttpRequest
+// @grant         GM_getValue
+// @grant         GM_setValue
+// @connect       docs.google.com
+// @connect       googleusercontent.com
+// @connect       script.google.com
 // @match         https://www.torn.com/item.php
 // @updateURL     https://raw.githubusercontent.com/therealharish/tampermonkey/main/Inventory%20Sorter.js
 // @downloadURL   https://raw.githubusercontent.com/therealharish/tampermonkey/main/Inventory%20Sorter.js
@@ -20,6 +25,112 @@
   let posOriginal;
   let loadedAll = false;
   let priceSortBtn, quantitySortBtn;
+
+  // --- CSV Price Map ---
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQxfChP4booUCi7dTSVyJoJDPDvYt5AXIzsieqPN0LjSnakjiw_F0sET3K0Atdqc4tSBpJCZH-6nkwb/pub?output=csv";
+  const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+  let priceMap = JSON.parse(GM_getValue("invSorterPriceMap", "{}"));
+  let priceMapFetchedAt = parseInt(GM_getValue("invSorterPriceFetchedAt", "0")) || 0;
+  let csvReady = Object.keys(priceMap).length > 0;
+
+  function csvSplitRow(line) {
+    const cols = []; let cur = "", inQ = false;
+    for (let c = 0; c < line.length; c++) {
+      const ch = line[c];
+      if (inQ) {
+        if (ch === '"' && line[c + 1] === '"') { cur += '"'; c++; }
+        else if (ch === '"') inQ = false;
+        else cur += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === ",") { cols.push(cur); cur = ""; }
+        else cur += ch;
+      }
+    }
+    cols.push(cur);
+    return cols;
+  }
+
+  function parseBuyCsv(text) {
+    const map = {};
+    const lines = text.split(/\r?\n/);
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line || !line.trim()) continue;
+      const cols = csvSplitRow(line);
+      if (cols.length < 5) continue;
+      const id = parseInt((cols[1] || "").trim(), 10);
+      if (!id) continue;
+      const normRaw = (cols[2] || "").replace(/[$,]/g, "").trim();
+      const bulkRaw = (cols[4] || "").replace(/[$,]/g, "").trim();
+      const norm = (normRaw && normRaw !== "#N/A") ? parseFloat(normRaw) : 0;
+      const bulk = (bulkRaw && bulkRaw !== "#N/A") ? parseFloat(bulkRaw) : 0;
+      const floor = bulk > 0 ? bulk : norm;
+      if (floor > 0) map[id] = floor;
+    }
+    return map;
+  }
+
+  function fetchPricesCsv(force) {
+    const age = Date.now() - priceMapFetchedAt;
+    if (!force && age < CACHE_TTL_MS && csvReady) return;
+    GM_xmlhttpRequest({
+      method: "GET",
+      url: CSV_URL,
+      onload: (res) => {
+        try {
+          const map = parseBuyCsv(res.responseText);
+          priceMap = map;
+          priceMapFetchedAt = Date.now();
+          csvReady = true;
+          GM_setValue("invSorterPriceMap", JSON.stringify(map));
+          GM_setValue("invSorterPriceFetchedAt", String(priceMapFetchedAt));
+          injectInlinePrices();
+        } catch (e) {
+          console.error("[Inventory Sorter] CSV parse error:", e);
+        }
+      },
+      onerror: () => {
+        console.warn("[Inventory Sorter] Failed to fetch CSV prices.");
+      }
+    });
+  }
+
+  function getItemIdFromEl(itemEl) {
+    const img = itemEl.querySelector('img[src*="/items/"]');
+    if (!img) return null;
+    const match = img.src.match(/\/items\/(\d+)\//)
+               || img.src.match(/\/items\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
+  function injectInlinePrices() {
+    if (!csvReady) return;
+    document.querySelectorAll('[class*="items"] > li, [aria-hidden="false"] > li').forEach((itemEl) => {
+      if (itemEl.querySelector(".csv-item-price")) return;
+      const itemId = getItemIdFromEl(itemEl);
+      if (!itemId) return;
+      const unitPrice = priceMap[itemId] || 0;
+      if (unitPrice <= 0) return;
+
+      const quantityEl = itemEl.querySelector(".qty");
+      const qty = quantityEl ? +quantityEl.textContent.replace(/[^0-9]/g, "") || 1 : 1;
+      const total = Math.round(unitPrice * qty);
+
+      const priceSpan = document.createElement("span");
+      priceSpan.className = "csv-item-price";
+      if (qty > 1) {
+        priceSpan.textContent = `$${unitPrice.toLocaleString()} | ${qty}x = $${total.toLocaleString()}`;
+      } else {
+        priceSpan.textContent = `$${total.toLocaleString()}`;
+      }
+
+      const nameWrap = itemEl.querySelector(".name-wrap") || itemEl.querySelector('[class*="name"]');
+      if (nameWrap) {
+        nameWrap.parentElement.appendChild(priceSpan);
+      }
+    });
+  }
 
   function injectStyles() {
     const style = document.createElement("style");
@@ -60,6 +171,15 @@
         background: #4a7a2e;
         color: #fff;
         border-color: #5a9a3e;
+      }
+      .csv-item-price {
+        color: #7cfc00;
+        font-size: 11px;
+        font-weight: bold;
+        font-family: Arial, Helvetica, sans-serif;
+        margin-left: auto;
+        padding-right: 10px;
+        white-space: nowrap;
       }
     `;
     document.head.appendChild(style);
@@ -133,9 +253,9 @@
   async function triggerSort() {
     parentElement = document.querySelectorAll('[aria-hidden="false"]');
     if (!parentElement.length) return;
-    if (!document.querySelector(".tt-item-price")) {
+    if (!csvReady) {
       alert(
-        "Inventory Sorter requires Torn Tools to work properly. Make sure you install it before using this script!"
+        "Inventory Sorter is still loading prices. Please wait a moment and try again."
       );
       return;
     }
@@ -145,14 +265,15 @@
     }
     if (sortState === "default") {
       itemsOriginal = Array.from(parentElement[0].children).map((itemEl) => {
-          const priceEl = itemEl.querySelector(".tt-item-price");
-          const priceText = priceEl?.lastChild?.textContent || "0";
-          const price = +priceText.replace(/[^0-9.-]+/g, "") || 0;
+          const itemId = getItemIdFromEl(itemEl);
+          const unitPrice = (itemId && priceMap[itemId]) || 0;
 
           const quantityEl = itemEl.querySelector(".qty");
           const quantity = quantityEl
             ? +quantityEl.textContent.replace(/[^0-9]/g, "") || 0
             : 0;
+
+          const price = Math.round(unitPrice * (quantity || 1));
 
           return { element: itemEl, price, quantity };
         });
@@ -232,5 +353,12 @@
   }
 
   // Run initialization
+  fetchPricesCsv(false);
   init();
+
+  // Re-inject prices when DOM changes (new items loaded)
+  const priceObs = new MutationObserver(() => {
+    if (csvReady) injectInlinePrices();
+  });
+  priceObs.observe(document.body, { childList: true, subtree: true });
 })();
