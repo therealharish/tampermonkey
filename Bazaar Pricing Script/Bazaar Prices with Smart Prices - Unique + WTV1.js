@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name          Bazaar Filler With Smart Pricing - Unique
 // @namespace     http://tampermonkey.net/
-// @version       6.0
+// @version       6.1
 // @author        WTV1
 // @description   Advanced Bazaar Filler with Market and Bazaar Price Points + Fill All + Trade Fill + Visual Qty and Price currently on Bazaar
 // @match         https://www.torn.com/bazaar.php*
@@ -13,6 +13,7 @@
 // @connect       api.torn.com
 // @connect       weav3r.dev
 // @connect       script.google.com
+// @connect       docs.google.com
 // @downloadURL   https://raw.githubusercontent.com/therealharish/tampermonkey/main/Bazaar%20Pricing%20Script/Bazaar%20Prices%20with%20Smart%20Prices%20-%20Unique%20%2B%20WTV1.js
 // @updateURL     https://raw.githubusercontent.com/therealharish/tampermonkey/main/Bazaar%20Pricing%20Script/Bazaar%20Prices%20with%20Smart%20Prices%20-%20Unique%20%2B%20WTV1.js
 // ==/UserScript==
@@ -33,7 +34,10 @@
             priceSource: GM_getValue("priceSource", "bz"),
             smartFloor: parseFloat(GM_getValue("smartFloor", 95)),
             smartBzPos: parseInt(GM_getValue("smartBzPos", 2)),
-            skippedItems: JSON.parse(GM_getValue("skippedItems", "{}"))
+            skippedItems: JSON.parse(GM_getValue("skippedItems", "{}")),
+            buyCsvUrl: GM_getValue("buyCsvUrl", "https://docs.google.com/spreadsheets/d/e/2PACX-1vQxfChP4booUCi7dTSVyJoJDPDvYt5AXIzsieqPN0LjSnakjiw_F0sET3K0Atdqc4tSBpJCZH-6nkwb/pub?output=csv"),
+            buyFloorMap: JSON.parse(GM_getValue("buyFloorMap", "{}")),
+            buyFloorFetchedAt: parseInt(GM_getValue("buyFloorFetchedAt", 0)) || 0
         };
     }
     loadSettings();
@@ -84,6 +88,73 @@
         });
     }
     fetchTrendColors();
+
+    // --- BUY-PRICE FLOOR (CSV) ---
+    const BUY_FLOOR_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+    function parseBuyCsv(text) {
+        const map = {};
+        const lines = text.split(/\r?\n/);
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            if (!line) continue;
+            // Simple split is sufficient: the relevant columns (ID, Prices, Bulk Price) are unquoted numbers.
+            const cols = line.split(",");
+            if (cols.length < 5) continue;
+            const idRaw = (cols[1] || "").trim();
+            const id = parseInt(idRaw, 10);
+            if (!id) continue;
+            const normRaw = (cols[2] || "").replace(/[\"$,]/g, "").trim();
+            const bulkRaw = (cols[4] || "").replace(/[\"$,]/g, "").trim();
+            const norm = (normRaw && normRaw !== "#N/A") ? parseFloat(normRaw) : 0;
+            const bulk = (bulkRaw && bulkRaw !== "#N/A") ? parseFloat(bulkRaw) : 0;
+            const floor = bulk > 0 ? bulk : norm;
+            if (floor > 0) map[id] = floor;
+        }
+        return map;
+    }
+    function fetchBuyFloors(force, cb) {
+        if (!settings.buyCsvUrl) { if (cb) cb(false); return; }
+        const age = Date.now() - (settings.buyFloorFetchedAt || 0);
+        if (!force && age < BUY_FLOOR_TTL_MS && Object.keys(settings.buyFloorMap || {}).length > 0) {
+            if (cb) cb(true); return;
+        }
+        GM_xmlhttpRequest({
+            method: "GET", url: settings.buyCsvUrl,
+            onload: (res) => {
+                try {
+                    const map = parseBuyCsv(res.responseText);
+                    settings.buyFloorMap = map;
+                    settings.buyFloorFetchedAt = Date.now();
+                    GM_setValue("buyFloorMap", JSON.stringify(map));
+                    GM_setValue("buyFloorFetchedAt", settings.buyFloorFetchedAt);
+                    updateBuyFloorStatus();
+                    if (cb) cb(true);
+                } catch (e) { if (cb) cb(false); }
+            },
+            onerror: () => { if (cb) cb(false); }
+        });
+    }
+    function updateBuyFloorStatus() {
+        const $s = $("#cfg-buy-status");
+        if (!$s.length) return;
+        const count = Object.keys(settings.buyFloorMap || {}).length;
+        const ts = settings.buyFloorFetchedAt || 0;
+        let ageTxt = "never";
+        if (ts) {
+            const mins = Math.floor((Date.now() - ts) / 60000);
+            ageTxt = mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+        }
+        $s.text(`Loaded ${count} item floors (updated ${ageTxt})`);
+    }
+    function applyBuyFloor(price, itemId, $row) {
+        const floor = settings.buyFloorMap && settings.buyFloorMap[itemId];
+        if (floor && price < floor) {
+            if ($row && $row.find) $row.find('.item-toggle-btn').addClass('alert-red');
+            return floor;
+        }
+        return price;
+    }
+    fetchBuyFloors(false);
 
     const styleBlock = `
         /* --- 5.3 CORE STYLES --- */
@@ -180,6 +251,7 @@
                 if (targetPrice > 0 && targetPrice < 1000) targetPrice += 100;
                 if (targetPrice <= 0) { if ($btn) $btn.text('FILL'); return; }
                 let final = settings.undercutType === "percent" ? targetPrice * (1 - (settings.undercutVal/100)) : targetPrice - settings.undercutVal;
+                final = applyBuyFloor(final, itemId, $row);
                 updateTornInput($row.find('input[placeholder*="Price"], .input-money, [aria-label="Price"]'), final);
                 updateTornInput($row.find('input[placeholder*="Amount"], input[name="amount"], [aria-label="Amount"]'), myQty);
                 GM_xmlhttpRequest({ method: "GET", url: `https://weav3r.dev/api/marketplace/${itemId}`, onload: res => { try { const bzData = JSON.parse(res.responseText); const bzFloor = bzData.listings?.[0]?.price || 0; if (bzFloor > final) $row.find('.item-toggle-btn').addClass('alert-red'); else $row.find('.item-toggle-btn').removeClass('alert-red'); } catch(e){} } });
@@ -202,6 +274,7 @@
             let targetPrice = (bzPrice >= minAcceptable) ? bzPrice : minAcceptable;
             if (targetPrice <= 0) { if ($btn) $btn.text('FILL'); return; }
             let final = settings.undercutType === "percent" ? targetPrice * (1 - (settings.undercutVal/100)) : targetPrice - settings.undercutVal;
+            final = applyBuyFloor(final, itemId, $row);
             updateTornInput($row.find('input[placeholder*="Price"], .input-money, [aria-label="Price"]'), final);
             updateTornInput($row.find('input[placeholder*="Amount"], input[name="amount"], [aria-label="Amount"]'), $row.find('[class*="amount"], .amount, .count').first().text().replace(/[^0-9]/g, ''));
             // Red alert check
@@ -234,6 +307,7 @@
                 }
                 if (targetPrice) {
                     let final = settings.undercutType === "percent" ? targetPrice * (1 - (settings.undercutVal/100)) : targetPrice - settings.undercutVal;
+                    final = applyBuyFloor(final, itemId, $row);
                     updateTornInput($row.find('input[placeholder*="Price"], .input-money, [aria-label="Price"]'), final);
                     updateTornInput($row.find('input[placeholder*="Amount"], input[name="amount"], [aria-label="Amount"]'), $row.find('[class*="amount"], .amount, .count').first().text().replace(/[^0-9]/g, ''));
 
@@ -309,6 +383,7 @@
 
         const handlePriceClick = (price) => {
             let final = settings.undercutType === "percent" ? price * (1 - (settings.undercutVal/100)) : price - settings.undercutVal;
+            final = applyBuyFloor(final, itemId, $row);
             updateTornInput($row.find('input[placeholder*="Price"], .input-money, [aria-label="Price"]'), final);
             updateTornInput($row.find('input[placeholder*="Amount"], input[name="amount"], [aria-label="Amount"]'), $row.find('[class*="amount"], .amount, .count').first().text().replace(/[^0-9]/g, ''));
             $popup.hide();
@@ -437,11 +512,16 @@
             </div>
             <div class="cfg-field smart-field" style="display:none;"><label>Smart Floor % (min acceptable price)</label><input type="number" id="cfg-smart-floor" min="50" max="100" value="${settings.smartFloor}"></div>
             <div class="cfg-field smart-field" style="display:none;"><label>Smart Bazaar Listing Position (1-5)</label><input type="number" id="cfg-smart-bzpos" min="1" max="5" value="${settings.smartBzPos}"></div>
+            <div class="cfg-field"><label>Buy Price CSV URL</label><input type="text" id="cfg-buy-url" value="${settings.buyCsvUrl}"></div>
+            <div class="cfg-field" style="display:flex;align-items:center;gap:8px;"><a id="cfg-buy-refresh" style="cursor:pointer;color:#7cfc00;font-size:11px;font-weight:bold;text-transform:uppercase;">Refresh Prices Now</a><span id="cfg-buy-status" style="font-size:10px;color:#aaa;"></span></div>
             <div style="margin-top:20px;"><button class="btn-save" id="cfg-save">SAVE</button><button class="btn-close" id="cfg-close">CLOSE</button></div>
         </div>`).appendTo("body");
         function toggleSmartFields() { const show = $('#cfg-source').val() === 'smart'; $('.smart-field').toggle(show); }
         $('#cfg-source').on('change', toggleSmartFields); toggleSmartFields();
-        $("#cfg-save").on('touchstart click', (e) => { e.preventDefault(); GM_setValue("tornApiKey", $("#cfg-api").val()); GM_setValue("undercutVal", $("#cfg-val").val()); GM_setValue("undercutType", $("#cfg-type").val()); GM_setValue("undercutPos", $("#cfg-pos").val()); GM_setValue("priceSource", $("#cfg-source").val()); GM_setValue("smartFloor", $("#cfg-smart-floor").val()); GM_setValue("smartBzPos", $("#cfg-smart-bzpos").val()); loadSettings(); $("#filler-config-modal").hide(); });
+        $("#cfg-save").on('touchstart click', (e) => { e.preventDefault(); GM_setValue("tornApiKey", $("#cfg-api").val()); GM_setValue("undercutVal", $("#cfg-val").val()); GM_setValue("undercutType", $("#cfg-type").val()); GM_setValue("undercutPos", $("#cfg-pos").val()); GM_setValue("priceSource", $("#cfg-source").val()); GM_setValue("smartFloor", $("#cfg-smart-floor").val()); GM_setValue("smartBzPos", $("#cfg-smart-bzpos").val()); GM_setValue("buyCsvUrl", $("#cfg-buy-url").val()); loadSettings(); updateBuyFloorStatus(); $("#filler-config-modal").hide(); });
+        $("#cfg-buy-refresh").on('touchstart click', (e) => { e.preventDefault(); GM_setValue("buyCsvUrl", $("#cfg-buy-url").val()); loadSettings(); $("#cfg-buy-status").text("Refreshing..."); fetchBuyFloors(true, () => updateBuyFloorStatus()); });
+        $(document).on('click touchstart', '#f-cfg', () => { setTimeout(updateBuyFloorStatus, 0); });
+        updateBuyFloorStatus();
         $("#cfg-close").on('touchstart click', (e) => { e.preventDefault(); $("#filler-config-modal").hide(); });
     }
 
