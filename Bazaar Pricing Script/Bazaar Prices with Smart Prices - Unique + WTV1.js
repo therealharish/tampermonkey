@@ -14,6 +14,7 @@
 // @connect       weav3r.dev
 // @connect       script.google.com
 // @connect       docs.google.com
+// @connect       googleusercontent.com
 // @downloadURL   https://raw.githubusercontent.com/therealharish/tampermonkey/main/Bazaar%20Pricing%20Script/Bazaar%20Prices%20with%20Smart%20Prices%20-%20Unique%20%2B%20WTV1.js
 // @updateURL     https://raw.githubusercontent.com/therealharish/tampermonkey/main/Bazaar%20Pricing%20Script/Bazaar%20Prices%20with%20Smart%20Prices%20-%20Unique%20%2B%20WTV1.js
 // ==/UserScript==
