@@ -91,20 +91,35 @@
 
     // --- BUY-PRICE FLOOR (CSV) ---
     const BUY_FLOOR_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+    function csvSplitRow(line) {
+        const cols = []; let cur = '', inQ = false;
+        for (let c = 0; c < line.length; c++) {
+            const ch = line[c];
+            if (inQ) {
+                if (ch === '"' && line[c + 1] === '"') { cur += '"'; c++; }
+                else if (ch === '"') inQ = false;
+                else cur += ch;
+            } else {
+                if (ch === '"') inQ = true;
+                else if (ch === ',') { cols.push(cur); cur = ''; }
+                else cur += ch;
+            }
+        }
+        cols.push(cur);
+        return cols;
+    }
     function parseBuyCsv(text) {
         const map = {};
         const lines = text.split(/\r?\n/);
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i];
-            if (!line) continue;
-            // Simple split is sufficient: the relevant columns (ID, Prices, Bulk Price) are unquoted numbers.
-            const cols = line.split(",");
+            if (!line || !line.trim()) continue;
+            const cols = csvSplitRow(line);
             if (cols.length < 5) continue;
-            const idRaw = (cols[1] || "").trim();
-            const id = parseInt(idRaw, 10);
+            const id = parseInt((cols[1] || "").trim(), 10);
             if (!id) continue;
-            const normRaw = (cols[2] || "").replace(/[\"$,]/g, "").trim();
-            const bulkRaw = (cols[4] || "").replace(/[\"$,]/g, "").trim();
+            const normRaw = (cols[2] || "").replace(/[$,]/g, "").trim();
+            const bulkRaw = (cols[4] || "").replace(/[$,]/g, "").trim();
             const norm = (normRaw && normRaw !== "#N/A") ? parseFloat(normRaw) : 0;
             const bulk = (bulkRaw && bulkRaw !== "#N/A") ? parseFloat(bulkRaw) : 0;
             const floor = bulk > 0 ? bulk : norm;
