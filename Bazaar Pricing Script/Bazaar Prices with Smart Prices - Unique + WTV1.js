@@ -2,7 +2,7 @@
 // @name          Bazaar Filler With Smart Pricing - Unique
 // @namespace     http://tampermonkey.net/
 // @version       6.2
-// @author        WTV1
+// @author        Unique
 // @description   Advanced Bazaar Filler with Market and Bazaar Price Points + Fill All + Trade Fill + Visual Qty and Price currently on Bazaar
 // @match         https://www.torn.com/bazaar.php*
 // @match         https://www.torn.com/trade.php*
