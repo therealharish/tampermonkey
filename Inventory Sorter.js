@@ -175,7 +175,7 @@
         right: 146px;
         top: 50%;
         transform: translateY(-50%);
-        color: #7cfc00;
+        color: #65c32d;
         font-size: 10px;
         font-weight: bold;
         font-family: Arial, Helvetica, sans-serif;
