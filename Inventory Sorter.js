@@ -125,10 +125,8 @@
         priceSpan.textContent = `$${total.toLocaleString()}`;
       }
 
-      const nameWrap = itemEl.querySelector(".name-wrap") || itemEl.querySelector('[class*="name"]');
-      if (nameWrap) {
-        nameWrap.parentElement.appendChild(priceSpan);
-      }
+      itemEl.style.position = "relative";
+      itemEl.appendChild(priceSpan);
     });
   }
 
@@ -173,13 +171,18 @@
         border-color: #5a9a3e;
       }
       .csv-item-price {
+        position: absolute;
+        right: 146px;
+        top: 50%;
+        transform: translateY(-50%);
         color: #7cfc00;
-        font-size: 11px;
+        font-size: 10px;
         font-weight: bold;
         font-family: Arial, Helvetica, sans-serif;
-        margin-left: auto;
-        padding-right: 10px;
         white-space: nowrap;
+        z-index: 5;
+        text-align: right;
+        pointer-events: none;
       }
     `;
     document.head.appendChild(style);
