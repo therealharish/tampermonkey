@@ -2,7 +2,7 @@
 // @name          Inventory Sorter according to QTY
 // @namespace     https://greasyfork.org/en/users/1362698-iambatman
 // @description   Allows you to sort your inventory by price or quantity in ascending/descending order
-// @version       2.0.0
+// @version       2.0.1
 // @author        Unique
 // @grant         GM_xmlhttpRequest
 // @grant         GM_getValue
