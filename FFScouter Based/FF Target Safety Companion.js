@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         FF Target Safety Companion
 // @namespace    harishh.torn.userscripts
-// @version      1.1.2
+// @version      1.1.3
 // @description  Opens FF Scouter targets below a chosen stat limit and double-confirms risky attack links.
 // @author       Harish
 // @license      GPLv3
@@ -31,6 +31,11 @@
   let targetCursor = 0;
   let renderQueued = false;
   let stylesInjected = false;
+
+  function isEliminationPage() {
+    const url = new URL(window.location.href);
+    return url.pathname === '/page.php' && url.searchParams.get('sid') === 'elimination';
+  }
 
   /**
    * Convert values such as 950m, 5.92b, 2.1t, and 1,250,000 into a number.
@@ -444,7 +449,7 @@
   }
 
   function createPanel() {
-    if (!document.body || document.getElementById(`${SCRIPT_ID}-panel`)) return;
+    if (!isEliminationPage() || !document.body || document.getElementById(`${SCRIPT_ID}-panel`)) return;
 
     injectPanelStyles();
 
@@ -489,6 +494,17 @@
       setPanelMinimized(panel, !panel.classList.contains('ffts-minimized'));
     });
 
+    refreshPanelStatus();
+  }
+
+  function syncPanelVisibility() {
+    const panel = document.getElementById(`${SCRIPT_ID}-panel`);
+    if (!isEliminationPage()) {
+      panel?.remove();
+      return;
+    }
+
+    createPanel();
     refreshPanelStatus();
   }
 
@@ -576,12 +592,15 @@
   }
 
   function queueRefresh() {
+    if (!isEliminationPage()) {
+      document.getElementById(`${SCRIPT_ID}-panel`)?.remove();
+      return;
+    }
     if (renderQueued) return;
     renderQueued = true;
     window.requestAnimationFrame(() => {
       renderQueued = false;
-      createPanel();
-      refreshPanelStatus();
+      syncPanelVisibility();
     });
   }
 
@@ -589,16 +608,17 @@
   document.addEventListener('click', guardAttackClick, true);
 
   const start = () => {
-    createPanel();
+    syncPanelVisibility();
     const observer = new MutationObserver(queueRefresh);
     observer.observe(document.body, { childList: true, subtree: true });
     window.addEventListener('hashchange', queueRefresh);
     window.addEventListener('popstate', queueRefresh);
+    window.navigation?.addEventListener('currententrychange', queueRefresh);
     window.addEventListener('resize', () => {
       const panel = document.getElementById(`${SCRIPT_ID}-panel`);
       if (panel instanceof HTMLElement) savePanelPosition(panel);
     });
-    window.setInterval(refreshPanelStatus, 3000);
+    window.setInterval(syncPanelVisibility, 3000);
   };
 
   if (document.readyState === 'loading') {
