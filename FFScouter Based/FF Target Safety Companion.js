@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         FF Target Safety Companion
 // @namespace    harishh.torn.userscripts
-// @version      1.1.3
-// @description  Opens FF Scouter targets below a chosen stat limit and double-confirms risky attack links.
+// @version      1.2.0
+// @description  Opens FF Scouter targets below a chosen stat limit and double-confirms risky attack links in Tampermonkey and TornPDA.
 // @author       Harish
 // @license      GPLv3
 // @copyright    2026, Harish
 // @match        https://www.torn.com/*
 // @grant        GM_openInTab
 // @grant        GM_addStyle
-// @run-at       document-start
+// @run-at       document-end
 // @downloadURL  https://raw.githubusercontent.com/therealharish/tampermonkey/main/FFScouter%20Based/FF%20Target%20Safety%20Companion.js
 // @updateURL    https://raw.githubusercontent.com/therealharish/tampermonkey/main/FFScouter%20Based/FF%20Target%20Safety%20Companion.js
 // ==/UserScript==
@@ -35,6 +35,48 @@
   function isEliminationPage() {
     const url = new URL(window.location.href);
     return url.pathname === '/page.php' && url.searchParams.get('sid') === 'elimination';
+  }
+
+  function isTornPDA() {
+    return typeof window.PDA_httpGet === 'function'
+      || typeof window.flutter_inappwebview?.callHandler === 'function';
+  }
+
+  function addStyle(css) {
+    if (typeof GM_addStyle === 'function') {
+      GM_addStyle(css);
+      return;
+    }
+
+    const style = document.createElement('style');
+    style.textContent = css;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function openProfileInNewTab(url) {
+    if (typeof GM_openInTab === 'function') {
+      GM_openInTab(url, {
+        active: false,
+        insert: true,
+        setParent: true,
+      });
+      return { opened: true, background: true };
+    }
+
+    // TornPDA does not expose GM_openInTab. Its WebView intercepts _blank and
+    // creates a PDA browser tab; current TornPDA versions activate that tab.
+    const openedWindow = window.open(url, '_blank', 'noopener');
+    if (openedWindow) {
+      try {
+        openedWindow.opener = null;
+        openedWindow.blur();
+        window.focus();
+      } catch {
+        // The platform may isolate the newly created tab.
+      }
+    }
+
+    return { opened: true, background: !isTornPDA() };
   }
 
   /**
@@ -264,15 +306,10 @@
     const target = eligible[targetCursor];
     targetCursor = (targetCursor + 1) % eligible.length;
 
-    // This runs only from the user's explicit button click. The new tab stays
-    // in the background so the current target list remains active.
-    GM_openInTab(target.profileUrl, {
-      active: false,
-      insert: true,
-      setParent: true,
-    });
-
-    setStatus(`Opened ${target.name} (${target.estimateText}).`, 'safe');
+    // This runs only from the user's explicit button click.
+    const result = openProfileInNewTab(target.profileUrl);
+    const platformNote = result.background ? '' : ' TornPDA may switch to the new tab.';
+    setStatus(`Opened ${target.name} (${target.estimateText}).${platformNote}`, 'safe');
   }
 
   function clampPanelPosition(panel, requestedPosition) {
@@ -369,7 +406,7 @@
     if (stylesInjected) return;
     stylesInjected = true;
 
-    GM_addStyle(`
+    addStyle(`
       #${SCRIPT_ID}-panel {
         --ffts-border: var(--panel-divider-outer-side-color, #4e8f35);
         --ffts-background: var(--default-bg-panel-color, rgba(31, 34, 38, 0.97));
