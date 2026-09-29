@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Dynamic Chat Drafts
 // @namespace    harishh.torn.dynamic-chat
-// @version      0.2.0
+// @version      0.3.0
 // @description  Suggests a reply for the chat you open; only you can send it.
 // @license      GPLv3
 // @match        https://www.torn.com/*
@@ -22,8 +22,6 @@
     const STORAGE_KEY = 'torn-dynamic-chat-own-replies-v1';
     const MAX_SAMPLES = 80;
     const MAX_CONTEXT = 2500;
-    const DAILY_LIMIT = 100;
-    const DAILY_COUNT_KEY = 'torn-dynamic-chat-daily-requests-v1';
     const states = new WeakMap();
     const known = new Set();
 
@@ -87,14 +85,6 @@
             state.status.textContent = 'Open a conversation with messages to get a draft.';
             return;
         }
-        const today = new Date().toISOString().slice(0, 10);
-        const usage = GM_getValue(DAILY_COUNT_KEY, { day: today, count: 0 });
-        const count = usage.day === today ? usage.count : 0;
-        if (count >= DAILY_LIMIT) {
-            state.status.textContent = 'Daily draft limit reached. Try tomorrow.';
-            return;
-        }
-        GM_setValue(DAILY_COUNT_KEY, { day: today, count: count + 1 });
         const sequence = ++state.sequence;
         state.draft = '';
         state.draftNode.textContent = '';
@@ -103,7 +93,7 @@
         state.again.disabled = true;
         const payload = JSON.stringify({ context, chat: chatLabel(chat), samples: readSamples().slice(-16) });
         GM_xmlhttpRequest({
-            method: 'POST', url: SERVICE_URL, data: payload, timeout: 18000,
+            method: 'POST', url: SERVICE_URL, data: payload, timeout: 45000,
             headers: { 'Content-Type': 'application/json' },
             onload: response => {
                 if (sequence !== state.sequence || !visible(chat)) return;
