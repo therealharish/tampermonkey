@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Torn Dynamic Chat Drafts
 // @namespace    harishh.torn.dynamic-chat
-// @version      0.3.0
+// @version      0.4.0
 // @description  Suggests a reply for the chat you open; only you can send it.
 // @license      GPLv3
 // @match        https://www.torn.com/*
@@ -10,7 +10,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_xmlhttpRequest
-// @connect      127.0.0.1
+// @connect      *
 // @updateURL    https://raw.githubusercontent.com/therealharish/tampermonkey/main/Torn%20Dynamic%20Chat/Torn%20Dynamic%20Chat.user.js
 // @downloadURL  https://raw.githubusercontent.com/therealharish/tampermonkey/main/Torn%20Dynamic%20Chat/Torn%20Dynamic%20Chat.user.js
 // ==/UserScript==
@@ -18,8 +18,8 @@
 (() => {
     'use strict';
 
-    const SERVICE_URL = 'http://127.0.0.1:8765/generate';
     const STORAGE_KEY = 'torn-dynamic-chat-own-replies-v1';
+    const CONFIG_KEY = 'torn-dynamic-chat-gemini-v1';
     const MAX_SAMPLES = 80;
     const MAX_CONTEXT = 2500;
     const states = new WeakMap();
@@ -44,6 +44,31 @@
         return Array.isArray(value) ? value.filter(x => typeof x === 'string').slice(-MAX_SAMPLES) : [];
     }
 
+    function readConfig() {
+        const value = GM_getValue(CONFIG_KEY, {});
+        return value && typeof value === 'object' ? value : {};
+    }
+
+    function configure(state) {
+        const current = readConfig();
+        const url = window.prompt('Build VM Gemini draft URL (HTTPS, ending in /generate):', current.url || '');
+        if (url === null) return;
+        let parsed;
+        try { parsed = new URL(url.trim()); } catch (_) { /* Show the validation message below. */ }
+        if (!parsed || parsed.protocol !== 'https:' || parsed.pathname !== '/generate' || parsed.search || parsed.hash) {
+            state.status.textContent = 'Enter a valid HTTPS URL ending in /generate.';
+            return;
+        }
+        const token = window.prompt('Build VM chat access token (this is not your Gemini API key):', current.token || '');
+        if (token === null) return;
+        if (token.trim().length < 32) {
+            state.status.textContent = 'Access token must be at least 32 characters.';
+            return;
+        }
+        GM_setValue(CONFIG_KEY, { url: parsed.href, token: token.trim() });
+        state.status.textContent = 'Gemini connection saved in Tampermonkey.';
+    }
+
     function saveSample(text) {
         const clean = text.trim().replace(/\s+/g, ' ').slice(0, 500);
         if (clean.length < 3) return;
@@ -66,7 +91,7 @@
     }
 
     function chatContext(chat) {
-        const body = chat.querySelector('[class*="messages___"], [class*="chat-box-body___"], [class*="message-list___"]');
+        const body = chat.querySelector('[class*="scrollWrapper___"], [class*="messages___"], [class*="chat-box-body___"], [class*="message-list___"]');
         if (body?.innerText?.trim()) return body.innerText.trim().slice(-MAX_CONTEXT);
         const copy = (body || chat).cloneNode(true);
         copy.querySelectorAll('textarea, input, button, .tdc-panel, [class*="chat-box-footer___"], [class*="chat-box-header___"]').forEach(node => node.remove());
@@ -74,12 +99,17 @@
     }
 
     function chatLabel(chat) {
-        return (chat.querySelector('[class*="chat-box-header__name___"], [class*="title___"]')?.textContent || 'this chat').trim().slice(0, 80);
+        return (chat.querySelector('[class*="header___"], [class*="chat-box-header__name___"], [class*="title___"]')?.textContent || 'this chat').trim().slice(0, 80);
     }
 
     function requestDraft(chat, state) {
         if (!visible(chat) || document.visibilityState !== 'visible' || !document.hasFocus()) return;
         if (composer(chat)?.value.trim()) return; // Preserve anything the player is typing.
+        const config = readConfig();
+        if (!config.url || !config.token) {
+            state.status.textContent = 'Choose Setup to connect the build VM.';
+            return;
+        }
         const context = chatContext(chat);
         if (!context) {
             state.status.textContent = 'Open a conversation with messages to get a draft.';
@@ -93,13 +123,13 @@
         state.again.disabled = true;
         const payload = JSON.stringify({ context, chat: chatLabel(chat), samples: readSamples().slice(-16) });
         GM_xmlhttpRequest({
-            method: 'POST', url: SERVICE_URL, data: payload, timeout: 45000,
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', url: config.url, data: payload, timeout: 45000,
+            headers: { 'Content-Type': 'application/json', 'X-Chat-Token': config.token },
             onload: response => {
                 if (sequence !== state.sequence || !visible(chat)) return;
                 try {
                     const result = JSON.parse(response.responseText);
-                    if (response.status !== 200) throw new Error(result.error || `Helper returned ${response.status}`);
+                    if (response.status !== 200) throw new Error(result.error || `Gemini proxy returned ${response.status}`);
                     const draft = String(result.draft || '').trim().slice(0, 500);
                     if (!draft) throw new Error('AI returned an empty draft');
                     state.draft = draft;
@@ -112,7 +142,7 @@
                 state.again.disabled = false;
             },
             ontimeout: () => fail('Draft timed out. Try Again.'),
-            onerror: () => fail('Local helper unavailable. Start it, then try Again.')
+            onerror: () => fail('Build VM proxy unavailable. Check VPN and Setup, then try Again.')
         });
         function fail(message) {
             if (sequence !== state.sequence) return;
@@ -127,9 +157,9 @@
         const panel = document.createElement('section');
         panel.className = 'tdc-panel';
         panel.setAttribute('aria-label', 'AI chat draft');
-        panel.innerHTML = '<div class="tdc-row"><strong>AI draft</strong><span class="tdc-status"></span></div><div class="tdc-draft"></div><div class="tdc-row"><button type="button" class="tdc-paste" disabled>Paste draft</button><button type="button" class="tdc-again">Again</button><button type="button" class="tdc-style-button">Style</button></div><div class="tdc-style"><p>Add examples of replies you wrote, one per line. Saved only in Tampermonkey.</p><textarea aria-label="Your reply examples"></textarea><div class="tdc-row"><button type="button" class="tdc-save">Save examples</button><button type="button" class="tdc-clear">Clear learned replies</button></div></div>';
+        panel.innerHTML = '<div class="tdc-row"><strong>AI draft</strong><span class="tdc-status"></span></div><div class="tdc-draft"></div><div class="tdc-row"><button type="button" class="tdc-paste" disabled>Paste draft</button><button type="button" class="tdc-again">Again</button><button type="button" class="tdc-setup">Setup</button><button type="button" class="tdc-style-button">Style</button></div><div class="tdc-style"><p>Add examples of replies you wrote, one per line. Saved only in Tampermonkey.</p><textarea aria-label="Your reply examples"></textarea><div class="tdc-row"><button type="button" class="tdc-save">Save examples</button><button type="button" class="tdc-clear">Clear learned replies</button></div></div>';
         const state = {
-            panel, sequence: 0, draft: '', lastInserted: '',
+            panel, sequence: 0, draft: '', lastInserted: '', wasVisible: true,
             status: panel.querySelector('.tdc-status'),
             draftNode: panel.querySelector('.tdc-draft'),
             paste: panel.querySelector('.tdc-paste'),
@@ -151,6 +181,10 @@
             state.lastInserted = state.draft;
         });
         state.again.addEventListener('click', () => requestDraft(chat, state));
+        panel.querySelector('.tdc-setup').addEventListener('click', () => {
+            configure(state);
+            if (readConfig().url && readConfig().token) requestDraft(chat, state);
+        });
         const style = panel.querySelector('.tdc-style');
         panel.querySelector('.tdc-style-button').addEventListener('click', () => { style.toggleAttribute('open'); });
         panel.querySelector('.tdc-save').addEventListener('click', () => {
@@ -180,11 +214,18 @@
             known.add(chat);
             const state = states.get(chat);
             if (!state || !state.panel.isConnected) makePanel(chat);
+            else if (!state.wasVisible) {
+                state.wasVisible = true;
+                requestDraft(chat, state);
+            }
         });
         for (const chat of known) {
             if (!chat.isConnected) { known.delete(chat); continue; }
             const state = states.get(chat);
-            if (state && !visible(chat)) state.sequence++;
+            if (state && state.wasVisible && !visible(chat)) {
+                state.wasVisible = false;
+                state.sequence++;
+            }
         }
     }
 
@@ -201,7 +242,8 @@
             const button = target.closest('button');
             if (!button || button.closest('.tdc-panel')) return;
             const label = `${button.getAttribute('aria-label') || ''} ${button.getAttribute('title') || ''} ${button.textContent || ''}`;
-            if (!/\bsend\b/i.test(label)) return;
+            const composerButton = input.parentElement?.contains(button) && button.matches('[class*="iconWrapper___"]');
+            if (!composerButton && !/\bsend\b/i.test(label)) return;
         }
         const value = input.value.trim();
         if (!value) return;

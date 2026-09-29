@@ -1,41 +1,23 @@
 # Torn Dynamic Chat Drafts
 
-This adds a suggested reply when you open a chat while Torn is the active browser tab. **Paste draft** fills Torn's composer; you review it and press Torn's Send button yourself. It never sends a Torn chat request.
+The userscript prepares a suggested reply when you open a visible Torn chat. **Paste draft** fills Torn's composer; you review it and press Torn's Send button yourself. It never sends a Torn chat request. It stores up to 80 of your own manually sent replies in Tampermonkey, sends the most recent 16 style examples and at most 2,500 characters of visible chat to your build VM, and the VM sends those to Google's Gemini API. The **Style** control can add older examples. **Clear learned replies** deletes them locally.
 
-The script saves up to 80 of your own manually sent replies in Tampermonkey storage. The **Style** control lets you add older replies, one per line, so suggestions sound like you sooner. Generated drafts are not recycled as style examples unless you edit them. **Clear learned replies** removes the saved examples.
+Google currently lists [`gemini-3.1-flash-lite` as free for input and output tokens](https://ai.google.dev/gemini-api/docs/pricing), subject to [your project's active rate limits](https://ai.google.dev/gemini-api/docs/rate-limits). Google's free tier may use submitted data to improve its products. A free API key is not placed in this repository or in the userscript; [Google recommends a backend proxy for client apps](https://ai.google.dev/gemini-api/docs/api-key).
 
-## Free local setup on macOS
+## Build VM setup
 
-The default helper, `server.mjs`, uses [Ollama](https://ollama.com/) and the local `gemma3:4b` model. Your visible chat context (at most 2,500 characters) and up to 16 style examples stay on your Mac. There is no AI API key or per-reply charge. The model download is about 3.3 GB, and drafts need the Mac and Ollama running. The first draft after a restart can take longer while the model loads; the helper keeps it warm for 30 minutes.
+1. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) in a free-tier project. Keep the key private.
+2. Copy this directory to `/data/hdd/athens/torn-dynamic-chat` on `harishh-cs-bld.insieme.local`. Run `python3 -B configure_vm.py` there. It prompts privately for the Gemini key, creates a separate random chat access token, and saves both in owner-only files. The key must never be entered into Torn or Tampermonkey.
+3. Provide a browser reachable **HTTPS** endpoint to the VM. For an existing HTTPS reverse proxy, forward `/generate` to `http://127.0.0.1:8765/generate`. If the Python service itself handles HTTPS, supply a browser trusted certificate and key to `configure_vm.py`; it will listen on port 8765. An untrusted or self-signed certificate will not work without an explicit trust setup. Never expose a plain HTTP endpoint with the access token.
+4. Copy `torn-dynamic-chat.service` to `~/.config/systemd/user/`, then run `systemctl --user daemon-reload && systemctl --user enable --now torn-dynamic-chat.service`. Verify `curl http://127.0.0.1:8765/health` on the VM when using a reverse proxy, or `curl https://YOUR_HOST:8765/health` for direct TLS.
+5. Install the [GitHub-hosted userscript](https://raw.githubusercontent.com/therealharish/tampermonkey/main/Torn%20Dynamic%20Chat/Torn%20Dynamic%20Chat.user.js) in Tampermonkey. Open a chat, choose **Setup**, enter the HTTPS `/generate` URL and the value from the VM's `access-token.txt`. This token is stored in Tampermonkey on that browser. The script then prepares drafts on chat open. Keep Enhanced Chat Buttons enabled; this is a separate add-on.
 
-1. Install Ollama from its [official macOS download](https://ollama.com/download/mac). Start the Ollama app, or install the Homebrew CLI with `brew install ollama` and run `ollama serve` in a terminal.
-2. Download the local model once:
+Tampermonkey uses `@updateURL` and `@downloadURL` to fetch script updates from GitHub when `@version` increases. Server changes require updating the VM copy and restarting the user service. The VM proxy rejects requests without the separate access token, bounds input size, and caps calls to 100 per 24 hours per service process. It does not store chat context or generated drafts.
 
-   ```zsh
-   ollama pull gemma3:4b
-   ```
+This has not yet been verified against a live Torn chat DOM; Torn may require a selector adjustment.
 
-3. In a second terminal, from this directory, start the helper:
+## Development checks
 
-   ```zsh
-   node server.mjs
-   ```
+Run `python3 -B -m unittest test_server_gemini.py` for proxy validation and `node --check 'Torn Dynamic Chat.user.js'` for script syntax.
 
-4. Install the [GitHub-hosted userscript](https://raw.githubusercontent.com/therealharish/tampermonkey/main/Torn%20Dynamic%20Chat/Torn%20Dynamic%20Chat.user.js) in Tampermonkey. Keep Enhanced Chat Buttons enabled; this is a separate add-on.
-5. Open a Torn chat. The draft should appear above the composer. Add some of your own past replies through **Style** if you want it to sound like you immediately.
-
-Tampermonkey uses `@updateURL` and `@downloadURL` to fetch this script from GitHub. Bump `@version` whenever you change the userscript. Updates to the local helper or model still require a local download and restart.
-
-If the panel says **Local helper unavailable**, make sure both Ollama and `node server.mjs` are running, then click **Again**. This version has not yet been verified against a live Torn chat DOM; Torn may require a selector adjustment.
-
-## Optional paid Grok helper
-
-`server-grok.mjs` remains available if you want to use xAI credits instead. Run **only one helper at a time**, because both use port 8765. Grok API usage is billed per token; the free Grok app and Playground do not provide free production API calls. See [xAI pricing](https://docs.x.ai/developers/pricing).
-
-To use that optional helper, enter your own xAI key without putting it in shell history, then run it:
-
-```zsh
-read -rs XAI_API_KEY
-export XAI_API_KEY
-node server-grok.mjs
-```
+The previous local Ollama helper (`server.mjs`) and optional paid Grok helper (`server-grok.mjs`) remain in the directory for reference. Neither is used by the Gemini userscript.

@@ -1,0 +1,19 @@
+[Unit]
+Description=Torn Dynamic Chat Gemini draft proxy
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/hdd/athens/torn-dynamic-chat
+EnvironmentFile=/data/hdd/athens/torn-dynamic-chat/private.env
+ExecStart=/usr/bin/python3 -B /data/hdd/athens/torn-dynamic-chat/server_gemini.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/data/hdd/athens/torn-dynamic-chat
+
+[Install]
+WantedBy=default.target
